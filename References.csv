@@ -1,0 +1,35 @@
+Category,Sub-Category,Developer,URL
+Operating System & Core System,OS Stability & Unified Event Timeline,Petri Paavola,https://github.com/petripaavola/Get-WindowsTroubleshootingReportCommunity
+Operating System & Core System,General Windows Server Troubleshooting,Apress (Derek Schauland),https://github.com/Apress/troubleshooting-win-server-w-powershell
+Operating System & Core System,Microsoft TSS Diagnostic Framework Reference,andreipintica,https://github.com/andreipintica/TSSV2
+Hardware & Storage,Physical Disks & S.M.A.R.T. Diagnostics,Mike Nelson (mikenelson-io),https://github.com/mikenelson-io/MegaPowerShell
+Hardware & Storage,Cross-Subsystem & S.M.A.R.T. Scripts,Markus Fleschutz,https://github.com/fleschutz/PowerShell
+Storage & File Services,Storage Spaces / SMB / Failover Clustering Diagnostics,Microsoft PowerShell Team,https://github.com/PowerShell/PrivateCloud.DiagnosticInfo
+Storage & Virtualization,BitLocker / Hyper-V / Scheduled Tasks Toolkit,dschunk,https://github.com/dschunk/windows-it-toolkit
+Active Directory & Authentication,AD Health Checks & Diagnostics (Testimo),EvotecIT (Przemyslaw Klys),https://github.com/EvotecIT/Testimo
+Active Directory & Authentication,AD Management & Diagnostics (ADEssentials),EvotecIT (Przemyslaw Klys),https://github.com/EvotecIT/ADEssentials
+Active Directory & Authentication,AD Assessment / DNS / GPO Auditing,Mohamed-Zeghlache,https://github.com/Mohamed-Zeghlache/AD-Assessment-PowerShell-Script
+Active Directory & Authentication,AD Documentation & Diagnostic Logging,AsBuiltReport,https://github.com/AsBuiltReport/AsBuiltReport.Microsoft.AD
+Active Directory & Authentication,NTLM Authentication & Pass-Through Auditing,BetaHydri,https://github.com/BetaHydri/Get-NtlmLogonEvents
+Active Directory & Authentication,Group Policy Auditing & Troubleshooting (GPOZaurr),EvotecIT (Przemyslaw Klys),https://github.com/EvotecIT/GPOZaurr
+Security,Security Auditing & Logon Failure Investigation,Dan-Duran,https://github.com/Dan-Duran/Windows-Security-Scripts
+Security,Windows Security Baseline & Hardening Audit,HardeningKitty (Michael Schneider),https://github.com/HardeningKitty/HardeningKitty
+Security,AppLocker & WDAC Application Control,Microsoft,https://github.com/microsoft/AaronLocker
+Security,WDAC & Windows Security Hardening,HotCakeX,https://github.com/HotCakeX/Harden-Windows-Security
+User Profiles,FSLogix Profile Container Runbooks & Diagnostics,Big Hat Group Inc,https://github.com/Big-Hat-Group-Inc/FSLogixRunbookTemplate
+Updates & Patch Management,Windows Update Client Management & Reset (PSWindowsUpdate),Michal Gajda (mgajda83),https://github.com/mgajda83/PSWindowsUpdate
+Updates & Patch Management,Windows Update Repair & Recovery,SysAdminDoc,https://github.com/SysAdminDoc/WURepair
+Certificates & PKI,AD CS / CRL / SSL-TLS Diagnostics (PSPKI),Vadims Podans (Crypt32),https://github.com/Crypt32/PSPKI
+Certificates & PKI,AD CS Security & Certificate Template Auditing,F-Secure Labs,https://github.com/FSecureLABS/PSPKIAudit
+Remote Connectivity,RDP & Terminal Services Diagnostics,paulmann,https://github.com/paulmann/RDP-Diagnostic-Tool
+Remote Connectivity,RDP Connectivity & Configuration Audit (rdp_status.ps1),Google Cloud Platform,https://github.com/GoogleCloudPlatform/compute-image-tools
+Cloud & Identity,Microsoft Entra ID / Hybrid Join Diagnostics (DSRegTool),Microsoft Azure Samples,https://github.com/Azure-Samples/DSRegTool
+Cloud & Identity,Microsoft Entra ID Endpoint Connectivity Check,Microsoft Azure Samples,https://github.com/Azure-Samples/TestDeviceRegConnectivity
+Cloud & Identity,Microsoft Intune Device Health & Compliance,NullSpace-BitCradle,https://github.com/NullSpace-BitCradle/Intune_PowerShell_Scripts
+Web Services & Application Platform,IIS / TLS / Server Health Checker Patterns,Microsoft CSS,https://github.com/microsoft/CSS-Exchange
+Performance,Performance Monitor (PerfMon) Log Analysis (PAL),Clint Huffman,https://github.com/clinthuffman/PAL
+Performance,Lightweight Performance Counter Analysis,andrewcr7,https://github.com/andrewcr7/ExPerfAnalyzer
+Event Log Infrastructure,Event Log Querying & Analysis (EventViewerX / PSEventViewer),EvotecIT (Przemyslaw Klys),https://github.com/EvotecIT/EventViewerX
+Event Log Infrastructure,Remote Event Log Manager (WinRM / RPC / SMB),jagilber,https://github.com/jagilber/powershellScripts
+Event Log Infrastructure,Windows Event Forwarding (WEF) & Audit Configuration,Black Hills Information Security,https://github.com/blackhillsinfosec/EventLogging
+Architecture & Web Interface,PowerShell Web Server & REST API Framework (Pode),Matthew Kelly (Badgerati),https://github.com/Badgerati/Pode

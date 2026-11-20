@@ -1,0 +1,497 @@
+Top-Level Categories:
+
+Operating System
+Boot & Recovery
+Hardware
+Storage
+Networking
+Identity & Authentication
+Security
+User Profiles
+Windows Services
+Updates & Patch Management
+Certificates & PKI
+Remote Access
+Application Platform
+Virtualization
+Cloud Management
+Web Services
+File Services
+Scheduled Tasks
+Time Service
+Licensing & Activation
+Performance
+Event Logging
+Recovery & Maintenance
+
+Sub-categories:
+
+1. Operating System & Core System
+1.1 Boot & Startup
+Subcategories
+BIOS/UEFI Issues
+Secure Boot
+TPM Initialization
+Windows Boot Manager
+BCD Corruption
+WinRE Recovery
+Startup Repair
+Driver Initialization Failures
+Fast Startup Problems
+Logs
+System
+Setup
+Microsoft-Windows-Kernel-Boot
+Microsoft-Windows-BootUX
+Services/Components
+Boot Configuration Data (BCD)
+Winload
+Secure Boot
+TPM
+
+1.2 Shutdown & Restart
+Subcategories
+Unexpected Shutdowns
+System Hangs on Restart
+Power Loss
+Bugchecks During Shutdown
+Logs
+Kernel-Power
+Event ID 41
+Event ID 1074
+Event ID 6008
+
+1.3 Operating System Stability
+Subcategories
+System Crashes
+BSOD
+Kernel Panics
+Service Crashes
+Hung Processes
+Memory Dump Analysis
+Logs
+System
+Application
+Reliability Monitor
+Sources
+Kernel-General
+Kernel-Power
+BugCheck
+
+2. Hardware
+2.1 Processor (CPU)
+Issues
+Overheating
+Microcode Failures
+High Utilization
+Interrupt Storms
+Logs
+Processor
+WHEA
+2.2 Memory (RAM)
+Issues
+Memory Leaks
+Faulty Memory
+Paging Problems
+Commit Limit Exhaustion
+Logs
+Resource Exhaustion Detector
+MemoryDiagnostics
+2.3 Motherboard & Chipset
+Issues
+PCI Device Errors
+Bus Failures
+Firmware Problems
+Logs
+WHEA-Logger
+2.4 Graphics
+Issues
+GPU Driver Crashes
+Display Issues
+TDR Events
+Logs
+Display
+DxgKrnl
+2.5 USB Devices
+Issues
+Enumeration Failures
+Device Disconnects
+Driver Issues
+Logs
+Kernel-PnP
+USBHUB
+2.6 Printers
+Issues
+Print Failures
+Spooler Crashes
+Driver Issues
+Logs
+PrintService
+
+3. Storage
+3.1 Physical Disks
+Issues
+Disk Failure
+SMART Errors
+Read/Write Errors
+Latency
+Logs
+Disk
+NTFS
+StorPort
+StorAHCI
+3.2 File System
+Issues
+NTFS Corruption
+ReFS Errors
+Chkdsk Events
+Logs
+NTFS
+ReFS
+3.3 Storage Spaces
+Issues
+Pool Degradation
+Disk Loss
+Capacity Issues
+Logs
+StorageSpaces-Driver
+3.4 BitLocker
+Issues
+Encryption Failures
+Recovery Key Problems
+TPM Issues
+Logs
+BitLocker-API
+BitLocker-Driver
+
+4. Networking
+4.1 Network Adapter
+Issues
+Link Failures
+Driver Issues
+Speed Negotiation
+Logs
+NDIS
+NetAdapter
+4.2 TCP/IP Stack
+Issues
+Packet Loss
+Routing Problems
+MTU Issues
+Winsock Corruption
+Logs
+TCPIP
+Winsock
+4.3 DHCP Client
+Issues
+Lease Failures
+Renewal Failures
+IP Conflicts
+Logs
+DHCP-Client
+Service
+DHCP Client
+4.4 DNS Client
+Issues
+Name Resolution
+Registration Failures
+Cache Issues
+Logs
+DNS Client Events
+Service
+Dnscache
+4.5 Wireless
+Issues
+Authentication
+Roaming
+Signal Quality
+Logs
+WLAN-AutoConfig
+4.6 VPN
+Issues
+Tunnel Failures
+Certificate Issues
+Authentication
+Logs
+RasClient
+IKEEXT
+4.7 Firewall
+Issues
+Blocked Traffic
+Rule Failures
+Policy Issues
+Logs
+Windows Firewall
+Security Log
+
+5. Active Directory & Authentication
+5.1 Logon
+Issues
+Login Failures
+Account Lockouts
+Expired Passwords
+Logs
+Security
+Event IDs
+4624
+4625
+4771
+4776
+5.2 Kerberos
+Issues
+Ticket Failures
+SPN Problems
+Delegation Issues
+Logs
+Kerberos
+5.3 NTLM
+Issues
+Legacy Authentication
+Pass-through Failures
+Logs
+NTLM Operational
+5.4 Group Policy
+Issues
+Processing Failures
+Policy Conflicts
+Slow GP Processing
+Logs
+GroupPolicy Operational
+
+6. Security
+6.1 Microsoft Defender
+Issues
+Scan Failures
+Signature Updates
+Threat Detection
+Logs
+Microsoft-Windows-Windows Defender
+6.2 Credential Guard
+Logs
+DeviceGuard
+6.3 AppLocker
+Logs
+AppLocker
+6.4 WDAC
+Logs
+Code Integrity
+6.5 SmartScreen
+Logs
+SmartScreen
+6.6 Security Auditing
+Logs
+Security
+Event IDs
+4624
+4625
+4672
+4688
+4697
+
+7. User Profiles
+Issues
+Corrupt Profiles
+Temporary Profiles
+Roaming Profile Failures
+FSLogix Issues
+Logs
+User Profile Service
+
+8. Windows Services
+Generic Service Issues
+Issues
+Service Won't Start
+Dependency Failures
+Timeout Problems
+Crashes
+Logs
+Service Control Manager
+Event IDs
+7000
+7001
+7009
+7031
+7034
+
+9. Updates & Patch Management
+Windows Update
+Issues
+Download Failures
+Install Failures
+Rollback Failures
+Logs
+WindowsUpdateClient
+WSUS
+Issues
+Detection Failures
+Approval Problems
+Logs
+WindowsUpdate
+
+10. Certificates & PKI
+Issues
+Expired Certs
+Revocation Failures
+TLS Problems
+Logs
+CAPI2
+
+11. Remote Connectivity
+RDP
+Issues
+Login Failures
+Licensing Problems
+Session Disconnects
+Logs
+TerminalServices
+WinRM
+Issues
+PowerShell Remoting
+Management Failures
+Logs
+WinRM
+
+12. Application Platform
+.NET
+Issues
+CLR Crashes
+Runtime Errors
+Logs
+.NET Runtime
+COM / DCOM
+Issues
+Activation Failures
+Permission Denied
+Logs
+DistributedCOM
+PowerShell
+Issues
+Script Failures
+Module Loading
+Logs
+PowerShell Operational
+
+13. Virtualization
+Hyper-V
+Issues
+VM Startup Failure
+Checkpoint Issues
+Storage Issues
+Logs
+Hyper-V-VMMS
+Hyper-V-Hypervisor
+WSL
+Issues
+Linux Startup
+Networking
+File Sharing
+Logs
+LxssManager
+
+14. Cloud & Identity
+Microsoft Entra ID
+Issues
+Join Failures
+Registration Errors
+Token Problems
+Logs
+User Device Registration
+Intune
+Issues
+Enrollment
+Compliance
+Policy Deployment
+Logs
+DeviceManagement-Enterprise-Diagnostics
+
+15. Web Services
+IIS
+Issues
+Website Offline
+App Pool Failure
+SSL Errors
+Logs
+IIS Logs
+WAS
+W3SVC
+
+16. File Services
+SMB
+Issues
+Share Access
+Authentication
+Performance
+Logs
+SMBClient
+SMBServer
+DFS
+Issues
+Namespace Issues
+Replication Failures
+Logs
+DFS Replication
+
+17. Scheduled Tasks
+Issues
+Task Failures
+Credential Expiration
+Trigger Problems
+Logs
+TaskScheduler
+
+18. Time Service
+Issues
+Clock Drift
+NTP Issues
+Kerberos Time Skew
+Logs
+Time-Service
+Service
+W32Time
+
+19. Licensing & Activation
+Issues
+Activation Failures
+KMS Issues
+MAK Issues
+Logs
+Security-SPP
+
+20. Performance
+CPU
+High Utilization
+Runaway Processes
+Memory
+Leaks
+Paging
+Storage
+High Latency
+Queue Length
+Network
+Throughput
+Packet Loss
+Sources
+Performance Monitor
+Resource Monitor
+WPR/WPA
+
+21. Event Log Infrastructure
+Issues
+Event Log Corruption
+Log Full
+Auditing Failures
+Logs
+EventLog
+Security
+System
+Application
+
+22. Recovery & Maintenance
+SFC
+Windows Resource Protection
+DISM
+Component Store Corruption
+Reliability Monitor
+Application Failures
+Service Crashes
+

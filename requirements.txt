@@ -1,0 +1,236 @@
+================================================================================
+WinInspector — Windows Server 2025 Deployment & Requirements Guide
+================================================================================
+
+This document lists all prerequisites and step-by-step setup instructions for
+running WinInspector on Windows Server 2025 under either:
+  - Use Case A: Local Background PowerShell Process (http://localhost:8085)
+  - Use Case B: Centralized IIS Website over HTTPS with Hostname & Certificate
+
+--------------------------------------------------------------------------------
+1. COMMON PREREQUISITES (MANAGEMENT SERVER - WINDOWS SERVER 2025)
+--------------------------------------------------------------------------------
+1. Operating System:
+   - Windows Server 2025 (Standard or Datacenter, Desktop Experience or Server Core)
+   - Domain-joined (recommended for Kerberos authentication against domain targets)
+
+2. PowerShell Runtimes & Modules:
+   - PowerShell 7.4+ LTS (pwsh.exe)
+     Download / install via winget:
+       winget install --id Microsoft.PowerShell --source winget
+   - Windows PowerShell 5.1 (built into Windows Server 2025)
+   - Pode PowerShell Module (v2.14+):
+       * For Use Case A (single-user local):
+           Install-Module -Name Pode -Scope CurrentUser
+       * For Use Case B (IIS / Windows Service / all users):
+           Install-Module -Name Pode -Scope AllUsers
+
+3. Database & Auth Stores (Built-In - Zero Install Required):
+   - Uses Windows native C:\Windows\System32\winsqlite3.dll (included in Windows Server 2025)
+   - Live performance monitoring sessions, adapter packet errors, top processes,
+     and connection/SMB/pipe samples are persisted to: <AppRoot>\data\wininspector.db
+   - Local Passthrough master password hash (PBKDF2-SHA256; default 'a1b2c3'
+     with first-time reset prompt) is stored in: <AppRoot>\data\master-auth.json
+
+4. Native Windows Server Tools Used by WinInspector:
+   - qwinsta.exe & rwinsta.exe (included natively in C:\Windows\System32\ on Server 2025)
+   - w32tm.exe, dism.exe, dsregcmd.exe, sc.exe (included natively)
+   - Optional RSAT Modules (if querying AD/GPO/DNS/PKI helpers from Mgmt Server):
+       Install-WindowsFeature RSAT-AD-PowerShell, GPMC, RSAT-DNS-Server, RSAT-ADCS-Mgmt
+
+5. Unblock Files (if copied/extracted from ZIP or network share):
+   Get-ChildItem -Path "C:\Path\To\WinInspector" -Recurse | Unblock-File
+
+--------------------------------------------------------------------------------
+2. TARGET SERVER PREREQUISITES & FIREWALL PORTS
+--------------------------------------------------------------------------------
+Target servers require NO installed WinInspector agent. Ensure the following
+between the Management Server and Target Windows Servers:
+
+  - TCP 5986 : WinRM over HTTPS (Preferred encrypted PowerShell Remoting)
+  - TCP 5985 : WinRM over HTTP (Domain Kerberos-encrypted PowerShell Remoting)
+  - TCP 135  : RPC Endpoint Mapper (WMI/CIM-DCOM, Remote Event Log, qwinsta/rwinsta)
+  - TCP 49152-65535 : Dynamic RPC range (for DCOM / Event Log / qwinsta fallback)
+  - TCP 445  : SMB (for reading pfirewall.log, DhcpSrvLog-*.txt, and admin shares)
+  - TCP/UDP 53, 88, 389 : DNS, Kerberos, LDAP to Domain Controllers
+
+Quick Target Onboarding (run on target servers if WinRM/EventLog rules are off):
+  .\deploy\Enable-WinInspectorTarget.ps1
+  (Optional: add -EnableWinRmHttps or -DiagnosticPrincipal "CORP\gMSA-WinInsp$")
+
+--------------------------------------------------------------------------------
+3. USE CASE A: LOCAL BACKGROUND POWERSHELL PROCESS (http://localhost:8085)
+--------------------------------------------------------------------------------
+Best for: Running directly on a management/jump server where administrators log
+into the server desktop and open a shortcut to http://localhost:8085.
+
+Step 1 - Stage Application Files:
+  Copy the WinInspector folder to a local path, e.g.:
+    C:\Tools\WinInspector\
+
+Step 2 - Install Pode Module:
+  Open PowerShell 7 (pwsh.exe) and run:
+    Install-Module -Name Pode -Scope CurrentUser -Force
+
+Step 3 - Verify Startup Interactively:
+  pwsh.exe -NoProfile -File "C:\Tools\WinInspector\server\Start-WinInspector.ps1" -DevMode
+  Test in browser or PowerShell:
+    http://localhost:8085/login
+  (Unauthenticated requests to / or /api/* redirect to /login or return 401.)
+
+Step 4 - Run Automatically in the Background as SYSTEM or a Local Account (Choose ONE method):
+
+  Method A1 - Background Windows Service / SYSTEM Scheduled Task (Recommended):
+    $action = New-ScheduledTaskAction `
+        -Execute "C:\Program Files\PowerShell\7\pwsh.exe" `
+        -Argument '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Tools\WinInspector\server\Start-WinInspector.ps1" -DevMode' `
+        -WorkingDirectory "C:\Tools\WinInspector"
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+    Register-ScheduledTask -TaskName "WinInspector-Local" -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+    Start-ScheduledTask -TaskName "WinInspector-Local"
+
+  Method A2 - Background Windows Service (e.g., using WinSW or NSSM):
+    Configure the service executable as:
+      "C:\Program Files\PowerShell\7\pwsh.exe"
+    Arguments:
+      -NoProfile -ExecutionPolicy Bypass -File "C:\Tools\WinInspector\server\Start-WinInspector.ps1" -DevMode
+    (Run under LocalSystem / NT AUTHORITY\SYSTEM or a local service account;
+     users must sign in at /login with their user@domain.net UPN before running
+     any diagnostics, and every command injects their session PSCredential.)
+
+Step 5 - Create Browser Shortcut:
+  Create a Desktop/Start Menu shortcut pointing to:
+    http://localhost:8085
+
+Notes for Use Case A:
+  - When run elevated (Administrator or NT AUTHORITY\SYSTEM), Start-WinInspector.ps1
+    automatically binds '*' (all interfaces, dual-stack IPv4/IPv6) on the chosen port;
+    when run unelevated, it binds 127.0.0.1 only.
+  - Native HTTPS can be enabled without IIS by passing:
+      -UseHttps -CertificateThumbprint "<THUMBPRINT>" (or -SelfSigned).
+  - Standard users sign in at /login using UserPrincipalName format (user@domain.net),
+    validated via Win32 LogonUser and stored solely in an in-memory per-session
+    SecureString vault.
+  - Local Passthrough (running as host process/SYSTEM without user credentials) is
+    strictly gated behind the "Local Passthrough" master password option (default:
+    a1b2c3, with first-time reset prompt).
+  - Alternate Credentials (Run-As) is permitted per-request over localhost in -DevMode.
+
+--------------------------------------------------------------------------------
+4. USE CASE B: CENTRALIZED IIS HOSTING OVER HTTPS (HOSTNAME + CERTIFICATE)
+--------------------------------------------------------------------------------
+Best for: Hosting WinInspector centrally on a Windows Server 2025 management
+server so administrators access https://wininspector.corp.local from their own
+workstations using Windows Single Sign-On (SSO).
+
+Step 1 - Install IIS Role & Windows Authentication on Windows Server 2025:
+  Run in an elevated PowerShell session:
+    Install-WindowsFeature -Name Web-Server, Web-Common-Http, Web-Static-Content, `
+      Web-Http-Errors, Web-Security, Web-Windows-Auth, Web-Http-Logging, `
+      Web-Mgmt-Tools, Web-Scripting-Tools
+
+Step 2 - Install PowerShell 7 LTS & Pode for All Users:
+  Install-Module -Name Pode -Scope AllUsers -Force
+  (Verify installed under C:\Program Files\PowerShell\Modules\Pode)
+
+Step 3 - Install IIS Hosting Bridge (Choose Option B1 OR Option B2):
+
+  Option B1 - IIS HttpPlatformHandler:
+    - Install Microsoft IIS HttpPlatformHandler v1.2 (x64):
+      https://www.iis.net/downloads/microsoft/httpplatformhandler
+    - Why useful: IIS manages the pwsh.exe Pode lifecycle automatically and
+      terminates HTTPS while Pode enforces forced /login UPN session auth.
+
+  Option B2 - IIS Application Request Routing (ARR) Reverse Proxy:
+    - Install IIS URL Rewrite 2.1 + IIS ARR 3.0 (via WebPI / MSI).
+    - In IIS Manager -> Server Node -> Application Request Routing Cache ->
+      Server Proxy Settings:
+        * Check "Enable proxy"
+        * Set Time-out (seconds) = 300
+    - In IIS Manager -> URL Rewrite -> View Server Variables -> Add:
+        * HTTP_X_FORWARDED_PROTO
+    - Run Pode continuously on 127.0.0.1:8085 as LocalSystem / Local Service Account (WinSW/NSSM):
+        pwsh.exe -NoProfile -File "C:\inetpub\WinInspector\server\Start-WinInspector.ps1" -Port 8085
+
+Step 4 - Provision DNS & TLS Certificate:
+  - Create a DNS A or CNAME record (e.g., wininspector.corp.local -> Mgmt Server IP).
+  - Request/import a Server Authentication TLS certificate for that FQDN into:
+      Cert:\LocalMachine\My
+  - Note its Thumbprint:
+      Get-ChildItem Cert:\LocalMachine\My | Select-Object Subject, Thumbprint, NotAfter
+
+Step 5 - Stage Files & Set Folder Permissions:
+  - Copy WinInspector to: C:\inetpub\WinInspector
+  - Grant Read & Execute on C:\inetpub\WinInspector to the IIS AppPool identity
+    (default: "IIS AppPool\WinInspector", or your domain gMSA account).
+  - Grant Modify (Read/Write) on:
+      C:\inetpub\WinInspector\logs   (for audit.jsonl & IIS stdout logs)
+      C:\inetpub\WinInspector\data   (for wininspector.db SQLite WAL files)
+
+Step 6 - Deploy IIS Site, AppPool, HTTPS Binding & Windows Auth:
+  Run as Administrator from C:\inetpub\WinInspector:
+
+  For Option B1 (HttpPlatformHandler):
+    .\deploy\Install-WinInspectorIIS.ps1 `
+      -SiteName "WinInspector" `
+      -PhysicalPath "C:\inetpub\WinInspector" `
+      -HostingMode "HttpPlatformHandler" `
+      -HttpsPort 443 `
+      -HostHeader "wininspector.corp.local" `
+      -CertificateThumbprint "<YOUR_CERT_THUMBPRINT>"
+
+  For Option B2 (ARR Reverse Proxy):
+    .\deploy\Install-WinInspectorIIS.ps1 `
+      -SiteName "WinInspector" `
+      -PhysicalPath "C:\inetpub\WinInspector" `
+      -HostingMode "ARR" `
+      -HttpsPort 443 `
+      -HostHeader "wininspector.corp.local" `
+      -CertificateThumbprint "<YOUR_CERT_THUMBPRINT>"
+
+  (Optional: pass -ServiceAccount "CORP\gMSA-WinInspector$" to run the AppPool
+   under a domain gMSA. If multiple HTTPS sites share port 443, enable "Require
+   Server Name Indication (SNI)" on the HTTPS binding in IIS Manager.)
+
+Step 7 - IIS Anonymous Access + Pode Forced UPN Login Gate:
+  - Since WinInspector enforces application-level HTTP session authentication at
+    /login (requiring user@domain.net UPN + password validated via Win32 LogonUser),
+    keep Anonymous Authentication = Enabled on the IIS reverse proxy / HttpPlatformHandler
+    site so browsers reach /login over HTTPS without IIS NTLM popups blocking the UI.
+  - Pode blocks all unauthenticated requests to /, /js/*, and /api/* (302 -> /login
+    or HTTP 401), so no diagnostic data or app JS loads before sign-in.
+
+Step 8 - Per-Session SecureString Credential Injection (No Kerberos Double-Hop Needed):
+  - When a user signs in at /login with user@domain.net, Pode validates the
+    UPN credentials via advapi32!LogonUser and stores a read-only SecureString
+    PSCredential in memory strictly keyed to that browser's HttpOnly Pode session ID.
+  - Even though Pode runs as NT AUTHORITY\SYSTEM or a local service account, every
+    remote WinRM/CIM/RPC/SMB/qwinsta call explicitly injects -Credential from that
+    caller's own session only. Signing out (or session expiration) disposes the
+    SecureString from memory immediately.
+
+Step 9 - Open Management Server Firewall & Verify:
+  New-NetFirewallRule -DisplayName "WinInspector HTTPS (443)" `
+    -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+  Test from a domain workstation browser:
+    https://wininspector.corp.local/
+
+--------------------------------------------------------------------------------
+5. POST-DEPLOYMENT VERIFICATION CHECKLIST
+--------------------------------------------------------------------------------
+[ ] Navigate to https://wininspector.corp.local/ -> verify automatic redirect to
+    /login and that unauthenticated /api/catalog & /api/health return HTTP 401.
+[ ] Attempt sign-in with DOMAIN\username -> verify UPN format rejection (400).
+[ ] Sign in with user@domain.net -> verify /api/health shows authenticatedAs=user@domain.net
+    and processIdentity=NT AUTHORITY\SYSTEM (or configured local account).
+[ ] Enter a target server FQDN -> click "Test Connection" -> verify DNS, WinRM
+    (5985/5986), RPC (135), SMB (445) status pills and OS details.
+[ ] Run Category 4.1 (Network Adapters) & 11.3 (Active RDP Sessions) to verify
+    script execution and qwinsta/WMI permissions.
+[ ] Run Category 20.1 (Performance) -> Start Monitoring (5s) -> confirm samples
+    persist in <AppRoot>\data\wininspector.db and charts update cleanly.
+[ ] Confirm <AppRoot>\logs\audit.jsonl records executed diagnostics without
+    logging any passwords or credentials.
+================================================================================
