@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Starts the WinInspector 100% Pure-PowerShell (Pode) Web & REST API Server.
@@ -14,6 +14,8 @@
     pwsh -NoProfile -File .\server\Start-WinInspector.ps1 -DevMode
 .EXAMPLE
     pwsh -NoProfile -File .\server\Start-WinInspector.ps1 -ListenAddress '*' -Port 8085
+.EXAMPLE
+    pwsh -NoProfile -File .\server\Start-WinInspector.ps1 -ListenAddress '*' -Port 443 -UseHttps
 .EXAMPLE
     pwsh -NoProfile -File .\server\Start-WinInspector.ps1 -ListenAddress '*' -Port 8443 -UseHttps -CertificateThumbprint "<THUMBPRINT>"
 #>
@@ -46,6 +48,105 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+function Resolve-WinInspectorServerCertificate {
+    <#
+    .SYNOPSIS
+        Finds the newest valid Server Authentication certificate in Cert:\LocalMachine\My
+        matching the local server's hostname or FQDN.
+    #>
+    [CmdletBinding()]
+    param()
+
+    $shortName = ([string]$env:COMPUTERNAME).Trim()
+    $candidateNames = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($shortName)) {
+        $candidateNames.Add($shortName)
+    }
+
+    try {
+        $dnsHost = [System.Net.Dns]::GetHostEntry($shortName).HostName
+        if (-not [string]::IsNullOrWhiteSpace($dnsHost) -and ($candidateNames -notcontains $dnsHost)) {
+            $candidateNames.Add($dnsHost.Trim())
+        }
+    }
+    catch {}
+
+    if (-not [string]::IsNullOrWhiteSpace($env:USERDNSDOMAIN) -and -not [string]::IsNullOrWhiteSpace($shortName)) {
+        $fqdnGuess = "$shortName.$($env:USERDNSDOMAIN.Trim())"
+        if ($candidateNames -notcontains $fqdnGuess) {
+            $candidateNames.Add($fqdnGuess)
+        }
+    }
+
+    $now = Get-Date
+    $allCerts = @(Get-ChildItem -Path 'Cert:\LocalMachine\My' -ErrorAction Stop)
+    $serverAuthOid = '1.3.6.1.5.5.7.3.1'
+
+    $matching = foreach ($cert in $allCerts) {
+        if (-not $cert.HasPrivateKey) { continue }
+        if ($cert.NotBefore -gt $now -or $cert.NotAfter -le $now) { continue }
+
+        $ekuList = if ($null -ne $cert.EnhancedKeyUsageList) { @($cert.EnhancedKeyUsageList) } else { @() }
+        $hasServerAuth = @($ekuList | Where-Object { $_.ObjectId -eq $serverAuthOid }).Count -gt 0
+        if (-not $hasServerAuth) { continue }
+
+        $certNames = [System.Collections.Generic.List[string]]::new()
+        if ($null -ne $cert.DnsNameList) {
+            foreach ($entry in @($cert.DnsNameList)) {
+                $dnsVal = ([string]$entry.Unicode).Trim()
+                if (-not [string]::IsNullOrWhiteSpace($dnsVal)) {
+                    $certNames.Add($dnsVal)
+                }
+            }
+        }
+        $cnMatch = [regex]::Match([string]$cert.Subject, '(?:^|,\s*)CN=([^,]+)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($cnMatch.Success) {
+            $cnVal = $cnMatch.Groups[1].Value.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($cnVal) -and ($certNames -notcontains $cnVal)) {
+                $certNames.Add($cnVal)
+            }
+        }
+
+        $nameMatched = $false
+        foreach ($certName in $certNames) {
+            foreach ($hostName in $candidateNames) {
+                if ($certName -ieq $hostName) {
+                    $nameMatched = $true
+                    break
+                }
+                if (-not [string]::IsNullOrWhiteSpace($shortName) -and $certName -ilike "$shortName.*") {
+                    $nameMatched = $true
+                    break
+                }
+                if ($certName.StartsWith('*.') -and $hostName.Contains('.')) {
+                    $suffix = $certName.Substring(2)
+                    $dotIdx = $hostName.IndexOf('.')
+                    if ($dotIdx -gt 0 -and $hostName.Substring($dotIdx + 1) -ieq $suffix) {
+                        $nameMatched = $true
+                        break
+                    }
+                }
+            }
+            if ($nameMatched) { break }
+        }
+        if (-not $nameMatched) { continue }
+
+        $isTrusted = $false
+        try { $isTrusted = $cert.Verify() } catch { $isTrusted = $false }
+        if (-not $isTrusted) { continue }
+
+        $cert
+    }
+
+    $selected = @($matching) | Sort-Object -Property NotAfter -Descending | Select-Object -First 1
+    if ($null -eq $selected) {
+        $searched = ($candidateNames -join ', ')
+        throw "No valid, trusted Server Authentication certificate with a private key was found in Cert:\LocalMachine\My matching [$searched]. Install a valid certificate or pass -CertificateThumbprint or -SelfSigned."
+    }
+
+    return $selected
+}
 
 # Support IIS HttpPlatformHandler dynamic port injection
 if ($env:HTTP_PLATFORM_PORT -and ($PSBoundParameters.ContainsKey('Port') -eq $false)) {
@@ -82,6 +183,12 @@ Initialize-WinInspectorMasterAuth -ConfigPath $masterAuthPath
 $credVault = New-WinInspectorCredVault
 
 $enableHttps = [bool]$UseHttps -or (-not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) -or [bool]$SelfSigned
+$resolvedThumbprint = $CertificateThumbprint.Trim()
+if ($enableHttps -and [string]::IsNullOrWhiteSpace($resolvedThumbprint) -and (-not $SelfSigned)) {
+    $selectedCert = Resolve-WinInspectorServerCertificate
+    $resolvedThumbprint = $selectedCert.Thumbprint
+    Write-Host "Using Server Authentication certificate: Subject='$($selectedCert.Subject)', Thumbprint='$resolvedThumbprint', Expires='$($selectedCert.NotAfter.ToString('yyyy-MM-dd'))'"
+}
 
 # Resolve default ListenAddress: '*' (all interfaces, dual-stack IPv4/IPv6) when elevated/SYSTEM,
 # falling back to '127.0.0.1' only when running unelevated.
@@ -115,8 +222,8 @@ Start-PodeServer -Threads $Threads -RootPath $projectRoot {
             Protocol = 'Https'
         }
         if ($useDualMode) { $epParams['DualMode'] = $true }
-        if (-not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
-            $epParams['CertificateThumbprint'] = $CertificateThumbprint.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($resolvedThumbprint)) {
+            $epParams['CertificateThumbprint'] = $resolvedThumbprint
         }
         else {
             $epParams['SelfSigned'] = $true
