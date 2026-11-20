@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WinInspector — Sign In</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    body.login-body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-app, #0f172a);
+      color: var(--text-primary, #f1f5f9);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-panel, #1e293b);
+      border: 1px solid var(--border-color, #334155);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .login-brand .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--accent, #3b82f6);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-brand h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .login-brand p {
+      margin: 0.15rem 0 0;
+      font-size: 0.8rem;
+      color: var(--text-muted, #94a3b8);
+    }
+    .login-field {
+      margin-bottom: 1rem;
+    }
+    .login-field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted, #94a3b8);
+      margin-bottom: 0.4rem;
+    }
+    .login-field input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.65rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border-color, #334155);
+      background: var(--bg-input, #0f172a);
+      color: var(--text-primary, #f1f5f9);
+      font-size: 0.95rem;
+    }
+    .login-field input:focus {
+      outline: none;
+      border-color: var(--accent, #3b82f6);
+    }
+    .login-hint {
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--text-muted, #94a3b8);
+    }
+    .login-error {
+      display: none;
+      margin-bottom: 1rem;
+      padding: 0.65rem 0.8rem;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    html[data-theme="light"] .login-error {
+      color: #b91c1c;
+    }
+    .login-error.visible {
+      display: block;
+    }
+    .login-submit {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent, #3b82f6);
+      color: #ffffff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .login-submit:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .login-footnote {
+      margin-top: 1.25rem;
+      font-size: 0.75rem;
+      color: var(--text-muted, #94a3b8);
+      line-height: 1.45;
+      border-top: 1px solid var(--border-color, #334155);
+      padding-top: 0.9rem;
+    }
+    .passthrough-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.15rem 0 0.9rem;
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .passthrough-divider::before,
+    .passthrough-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border-color, #334155);
+    }
+    .passthrough-btn {
+      width: 100%;
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border-color, #334155);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-primary, #f1f5f9);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .passthrough-btn:hover {
+      border-color: var(--accent, #3b82f6);
+      background: rgba(59, 130, 246, 0.12);
+    }
+    .passthrough-panel {
+      display: none;
+      margin-top: 0.9rem;
+      padding: 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color, #334155);
+      background: rgba(15, 23, 42, 0.45);
+    }
+    .passthrough-panel.visible {
+      display: block;
+    }
+    .passthrough-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .passthrough-actions .login-submit {
+      margin-top: 0;
+      flex: 1;
+    }
+    .passthrough-cancel {
+      padding: 0.65rem 0.9rem;
+      border: 1px solid var(--border-color, #334155);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted, #94a3b8);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="login-body">
+  <main class="login-card" role="main">
+    <div class="login-brand">
+      <div class="brand-mark">WI</div>
+      <div>
+        <h1>WinInspector</h1>
+        <p>Authenticated Windows Server Diagnostics</p>
+      </div>
+    </div>
+
+    <div id="loginError" class="login-error" role="alert"></div>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="login-field">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="user@domain.net"
+          pattern="^[^@\s\\\/]+@[^@\s\\\/]+\.[^@\s\\\/]+$"
+          title="Enter your account in UPN format (e.g. admin@domain.net)"
+          required
+          autofocus
+          spellcheck="false"
+          autocomplete="username"
+        />
+        <div class="login-hint">Must be in UPN format (<code>user@domain.net</code>). <code>DOMAIN\user</code> is not permitted.</div>
+      </div>
+
+      <div class="login-field">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          autocomplete="current-password"
+        />
+      </div>
+
+      <button type="submit" id="loginBtn" class="login-submit">Sign In</button>
+    </form>
+
+    <div class="passthrough-divider"><span>or</span></div>
+    <button type="button" id="localPassthroughToggleBtn" class="passthrough-btn">Local Passthrough</button>
+
+    <section id="masterPanel" class="passthrough-panel" aria-label="Local Passthrough Master Password">
+      <form id="masterLoginForm" autocomplete="off">
+        <div class="login-field">
+          <label for="masterPassword">Master Password</label>
+          <input
+            type="password"
+            id="masterPassword"
+            name="masterPassword"
+            placeholder="Enter master password"
+            required
+          />
+          <div class="login-hint">Unlocks execution as the host process / current user without entering domain credentials.</div>
+        </div>
+        <div class="passthrough-actions">
+          <button type="submit" id="masterUnlockBtn" class="login-submit">Unlock Local Passthrough</button>
+          <button type="button" id="masterCancelBtn" class="passthrough-cancel">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="masterResetPanel" class="passthrough-panel" aria-label="Reset Default Master Password">
+      <form id="masterResetForm" autocomplete="off">
+        <div class="login-hint" style="margin-bottom:0.75rem;color:#fcd34d;">
+          Default master password is active. Would you like to set a custom master password now?
+        </div>
+        <div class="login-field">
+          <label for="newMasterPassword">New Master Password</label>
+          <input type="password" id="newMasterPassword" minlength="4" placeholder="At least 4 characters" required />
+        </div>
+        <div class="login-field">
+          <label for="confirmMasterPassword">Confirm Master Password</label>
+          <input type="password" id="confirmMasterPassword" minlength="4" placeholder="Re-enter new master password" required />
+        </div>
+        <div class="passthrough-actions">
+          <button type="submit" id="masterSaveResetBtn" class="login-submit">Save &amp; Continue</button>
+          <button type="button" id="masterSkipResetBtn" class="passthrough-cancel">Keep Default</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="login-footnote">
+      Your password is stored strictly in an in-memory read-only SecureString bound only to your current server session and injected when executing remote diagnostics.
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('wininspector_theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+      } catch (e) {}
+
+      var upnRegex = /^[^@\s\\\/]+@[^@\s\\\/]+\.[^@\s\\\/]+$/;
+      var form = document.getElementById('loginForm');
+      var upnInput = document.getElementById('username');
+      var passwordInput = document.getElementById('password');
+      var loginBtn = document.getElementById('loginBtn');
+      var errorBox = document.getElementById('loginError');
+
+      function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.add('visible');
+      }
+
+      function clearError() {
+        errorBox.textContent = '';
+        errorBox.classList.remove('visible');
+      }
+
+      // Check if already authenticated
+      fetch('/api/auth/status', { credentials: 'include' })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (data && data.authenticated) {
+            window.location.replace('/');
+          }
+        })
+        .catch(function () {});
+
+      form.addEventListener('submit', async function (evt) {
+        evt.preventDefault();
+        clearError();
+
+        var username = (upnInput.value || '').trim();
+        var password = passwordInput.value || '';
+
+        if (!upnRegex.test(username)) {
+          showError('Username must be in UserPrincipalName format (e.g. user@domain.net).');
+          upnInput.focus();
+          return;
+        }
+        if (!password) {
+          showError('Password is required.');
+          passwordInput.focus();
+          return;
+        }
+
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Signing in...';
+
+        try {
+          var response = await fetch('/api/auth/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password })
+          });
+
+          var payload = {};
+          try {
+            payload = await response.json();
+          } catch (e) {}
+
+          if (!response.ok) {
+            showError(payload.error || ('Authentication failed (HTTP ' + response.status + ').'));
+            passwordInput.value = '';
+            passwordInput.focus();
+            return;
+          }
+
+          passwordInput.value = '';
+          window.location.replace('/');
+        } catch (err) {
+          showError('Unable to reach server: ' + (err && err.message ? err.message : 'Network error'));
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Sign In';
+        }
+      });
+
+      // Local Passthrough (Master Password) flow
+      var toggleBtn = document.getElementById('localPassthroughToggleBtn');
+      var masterPanel = document.getElementById('masterPanel');
+      var masterResetPanel = document.getElementById('masterResetPanel');
+      var masterLoginForm = document.getElementById('masterLoginForm');
+      var masterPasswordInput = document.getElementById('masterPassword');
+      var masterUnlockBtn = document.getElementById('masterUnlockBtn');
+      var masterCancelBtn = document.getElementById('masterCancelBtn');
+      var masterResetForm = document.getElementById('masterResetForm');
+      var newMasterInput = document.getElementById('newMasterPassword');
+      var confirmMasterInput = document.getElementById('confirmMasterPassword');
+      var masterSaveResetBtn = document.getElementById('masterSaveResetBtn');
+      var masterSkipResetBtn = document.getElementById('masterSkipResetBtn');
+
+      toggleBtn.addEventListener('click', function () {
+        clearError();
+        masterResetPanel.classList.remove('visible');
+        masterPanel.classList.toggle('visible');
+        if (masterPanel.classList.contains('visible')) {
+          masterPasswordInput.focus();
+        }
+      });
+
+      masterCancelBtn.addEventListener('click', function () {
+        clearError();
+        masterPasswordInput.value = '';
+        masterPanel.classList.remove('visible');
+      });
+
+      masterLoginForm.addEventListener('submit', async function (evt) {
+        evt.preventDefault();
+        clearError();
+        var pw = masterPasswordInput.value || '';
+        if (!pw) {
+          showError('Master password is required.');
+          masterPasswordInput.focus();
+          return;
+        }
+        masterUnlockBtn.disabled = true;
+        masterUnlockBtn.textContent = 'Unlocking...';
+        try {
+          var res = await fetch('/api/auth/master-login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw })
+          });
+          var data = {};
+          try { data = await res.json(); } catch (e) {}
+          if (!res.ok) {
+            showError(data.error || 'Invalid master password.');
+            masterPasswordInput.value = '';
+            masterPasswordInput.focus();
+            return;
+          }
+          masterPasswordInput.value = '';
+          if (data.isDefault) {
+            masterPanel.classList.remove('visible');
+            masterResetPanel.classList.add('visible');
+            newMasterInput.focus();
+          } else {
+            window.location.replace('/');
+          }
+        } catch (err) {
+          showError('Unable to reach server: ' + (err && err.message ? err.message : 'Network error'));
+        } finally {
+          masterUnlockBtn.disabled = false;
+          masterUnlockBtn.textContent = 'Unlock Local Passthrough';
+        }
+      });
+
+      masterSkipResetBtn.addEventListener('click', function () {
+        window.location.replace('/');
+      });
+
+      masterResetForm.addEventListener('submit', async function (evt) {
+        evt.preventDefault();
+        clearError();
+        var npw = newMasterInput.value || '';
+        var cpw = confirmMasterInput.value || '';
+        if (npw.length < 4) {
+          showError('New master password must be at least 4 characters.');
+          newMasterInput.focus();
+          return;
+        }
+        if (npw !== cpw) {
+          showError('Master passwords do not match.');
+          confirmMasterInput.focus();
+          return;
+        }
+        masterSaveResetBtn.disabled = true;
+        masterSaveResetBtn.textContent = 'Saving...';
+        try {
+          var res = await fetch('/api/auth/master-reset', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newPassword: npw })
+          });
+          var data = {};
+          try { data = await res.json(); } catch (e) {}
+          if (!res.ok) {
+            showError(data.error || 'Failed to update master password.');
+            return;
+          }
+          newMasterInput.value = '';
+          confirmMasterInput.value = '';
+          window.location.replace('/');
+        } catch (err) {
+          showError('Unable to reach server: ' + (err && err.message ? err.message : 'Network error'));
+        } finally {
+          masterSaveResetBtn.disabled = false;
+          masterSaveResetBtn.textContent = 'Save & Continue';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

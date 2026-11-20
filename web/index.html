@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WinInspector — Windows Server Diagnostics</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Bar: Brand + Target Server Connection Controls -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">WI</div>
+        <div>
+          <div class="brand-title">WinInspector</div>
+          <div class="brand-sub" id="serverIdentityLabel">Connecting to backend…</div>
+        </div>
+      </div>
+
+      <form id="connectionForm" class="connection-bar" autocomplete="off">
+        <div class="field-group field-server">
+          <label for="serverInput">Target Server (Hostname / FQDN)</label>
+          <input id="serverInput" type="text" list="recentServers" placeholder="e.g. DC01.corp.local or localhost" value="localhost" required />
+          <datalist id="recentServers"></datalist>
+        </div>
+
+        <div class="field-group">
+          <label for="authModeSelect">Authentication</label>
+          <select id="authModeSelect">
+            <option value="SessionLogin" selected>Authenticated Session (UPN)</option>
+            <option value="CustomCredentials">Alternate Credentials (Run-As)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="protocolSelect">Protocol</label>
+          <select id="protocolSelect">
+            <option value="Auto" selected>Auto (WinRM → RPC)</option>
+            <option value="WinRM-HTTPS">WinRM HTTPS (5986)</option>
+            <option value="WinRM-HTTP">WinRM HTTP (5985)</option>
+            <option value="CIM-DCOM">CIM / DCOM (135)</option>
+            <option value="RPC">RPC Event Log</option>
+          </select>
+        </div>
+
+        <div class="connection-actions">
+          <button type="button" id="credBtn" class="btn btn-secondary hidden" title="Enter alternate credentials">Credentials…</button>
+          <button type="submit" id="testConnBtn" class="btn btn-secondary">Test Connection</button>
+          <button type="button" id="themeToggleBtn" class="btn btn-ghost" title="Toggle Light/Dark Theme">Theme</button>
+          <button type="button" id="logoutBtn" class="btn btn-ghost" title="Sign out and destroy session credentials">Sign Out</button>
+        </div>
+      </form>
+    </header>
+
+    <!-- Target Connection Status Ribbon -->
+    <section id="connectionStatusRibbon" class="conn-ribbon hidden" aria-live="polite"></section>
+
+    <!-- Main Body: Category Sidebar + Workspace -->
+    <div class="app-body">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <input id="categorySearch" type="search" placeholder="Search categories, Event IDs (e.g. 4625, BSOD)…" />
+          <label class="checkbox-inline">
+            <input id="onlyImplementedToggle" type="checkbox" />
+            <span>Show ready only</span>
+          </label>
+        </div>
+        <nav id="categoryTree" class="category-tree" aria-label="Troubleshooting Categories"></nav>
+      </aside>
+
+      <main class="workspace">
+        <!-- Category Header & Dynamic Parameter Controls -->
+        <section class="panel category-panel">
+          <div class="category-header">
+            <div>
+              <h1 id="selectedTitle">Select a Troubleshooting Category</h1>
+              <p id="selectedDescription" class="muted">Choose a category from the left navigation tree to configure parameters and run remote diagnostics.</p>
+            </div>
+            <div id="selectedProtocols" class="protocol-badges"></div>
+          </div>
+
+          <form id="paramsForm" class="params-form hidden">
+            <div id="paramsGrid" class="params-grid"></div>
+            <div class="params-actions">
+              <div id="quickTimePresets" class="quick-presets"></div>
+              <div class="run-buttons">
+                <button type="submit" id="runAnalysisBtn" class="btn btn-primary">Run Analysis</button>
+                <button type="button" id="cancelRunBtn" class="btn btn-danger hidden">Cancel</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- Execution Meta & Warnings -->
+        <section id="alertsContainer" class="alerts-container hidden" aria-live="polite"></section>
+
+        <!-- Dynamic KPI Metrics Strip -->
+        <section id="metricsStrip" class="metrics-strip hidden"></section>
+
+        <!-- Interactive RDP Terminal Sessions Panel (qwinsta / rwinsta) -->
+        <section id="rdpSessionsPanel" class="panel rdp-sessions-panel hidden">
+          <div class="rdp-sessions-header">
+            <div>
+              <h2 style="margin:0;font-size:15px;">Active Terminal / RDP Sessions (<code>qwinsta</code> / <code>rwinsta</code> / <code>WMI</code>)</h2>
+              <p class="muted small" style="margin:2px 0 0 0;">Queries active sessions via <code>qwinsta /server:&lt;Server&gt;</code> (with WMI <code>Win32_LogonSession</code> fallback) and disconnects/kills sessions via <code>rwinsta</code> or WMI.</p>
+            </div>
+            <button type="button" id="queryQwinstaBtn" class="btn btn-primary btn-sm">Query Active Sessions</button>
+          </div>
+          <div id="rdpSessionsStatus" class="muted small"></div>
+          <div class="table-wrapper" style="max-height: 260px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Session ID</th>
+                  <th>Session Name</th>
+                  <th>User</th>
+                  <th>State</th>
+                  <th>Type</th>
+                  <th>Device / Procs</th>
+                  <th>Action (rwinsta / WMI)</th>
+                </tr>
+              </thead>
+              <tbody id="rdpSessionsTbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Interactive Live Performance, GPU & Network Monitor (Category 20) -->
+        <section id="perfMonitorPanel" class="panel perf-monitor-panel hidden">
+          <div class="perf-controls-bar">
+            <div class="perf-controls-left">
+              <div class="field-group">
+                <label for="perfIntervalSelect">Update Frequency</label>
+                <select id="perfIntervalSelect">
+                  <option value="1">Every 1 second</option>
+                  <option value="3">Every 3 seconds</option>
+                  <option value="5" selected>Every 5 seconds</option>
+                  <option value="10">Every 10 seconds</option>
+                  <option value="15">Every 15 seconds</option>
+                </select>
+              </div>
+              <button type="button" id="perfStartBtn" class="btn btn-primary">Start Monitoring</button>
+              <button type="button" id="perfStopBtn" class="btn btn-danger hidden">Stop Monitoring</button>
+              <span id="perfStatusBadge" class="pill pill-info">Idle (SQLite DB ready)</span>
+            </div>
+
+            <div class="perf-controls-right">
+              <div class="field-group">
+                <label for="perfSessionSelect">Saved DB Sessions</label>
+                <select id="perfSessionSelect"></select>
+              </div>
+              <button type="button" id="perfRefreshSessionsBtn" class="btn btn-secondary btn-sm">Refresh</button>
+            </div>
+          </div>
+
+          <div class="perf-charts-grid">
+            <div class="chart-card"><canvas id="chartCompute" height="180"></canvas></div>
+            <div class="chart-card"><canvas id="chartNetThroughput" height="180"></canvas></div>
+            <div class="chart-card"><canvas id="chartNetErrors" height="180"></canvas></div>
+            <div class="chart-card"><canvas id="chartBreakdown" height="180"></canvas></div>
+          </div>
+
+          <div class="perf-filters-bar">
+            <input id="perfFilterClientIp" type="text" placeholder="Filter Client IP (e.g. 10.1.2.)" />
+            <select id="perfFilterProtocol">
+              <option value="">All Protocols</option>
+              <option value="TCP">TCP</option>
+              <option value="UDP">UDP</option>
+              <option value="SMB">SMB</option>
+              <option value="NamedPipe">Named Pipe</option>
+            </select>
+            <select id="perfFilterService">
+              <option value="">All Services</option>
+            </select>
+            <input id="perfFilterProcess" type="text" placeholder="Filter Process (e.g. sqlservr)" />
+            <input id="perfFilterLocalPort" type="text" placeholder="Local Port (e.g. 49156)" />
+            <input id="perfFilterRemotePort" type="text" placeholder="Remote Port (e.g. 443)" />
+            <input id="perfFilterSearch" type="search" placeholder="Search SMB files / SQL pipes / ports…" />
+            <button type="button" id="perfApplyFilterBtn" class="btn btn-secondary btn-sm">Apply Filter</button>
+            <button type="button" id="perfClearFilterBtn" class="btn btn-ghost btn-sm">Clear</button>
+          </div>
+
+          <div class="perf-tabs-bar">
+            <div class="perf-tabs">
+              <button type="button" class="perf-tab active" data-perf-tab="processes">Top Processes (CPU / RAM / GPU)</button>
+              <button type="button" class="perf-tab" data-perf-tab="adapters">Network Adapters &amp; Packet Errors</button>
+              <button type="button" class="perf-tab" data-perf-tab="connections">Open Connections / Clients / Protocols</button>
+              <button type="button" class="perf-tab" data-perf-tab="smbpipes">SMB Open Files &amp; SQL / Named Pipes</button>
+            </div>
+            <button type="button" id="perfExportTabCsvBtn" class="btn btn-secondary btn-sm">Export Tab CSV</button>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead id="perfTabHead"></thead>
+              <tbody id="perfTabBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Faux Local Troubleshooting Terminal Panel (Category 23.1) -->
+        <section id="terminalPanel" class="panel terminal-panel hidden">
+          <div class="terminal-toolbar">
+            <div class="terminal-toolbar-left">
+              <span id="termHostBadge" class="pill pill-info">Host: localhost • Process: local • No Remote Credentials Used</span>
+            </div>
+            <div class="terminal-toolbar-right">
+              <label class="term-inline-label">
+                Shell
+                <select id="termShellSelect">
+                  <option value="PowerShell" selected>PowerShell</option>
+                  <option value="CMD">CMD (cmd.exe)</option>
+                </select>
+              </label>
+              <label class="term-inline-label">
+                Timeout
+                <select id="termTimeoutSelect">
+                  <option value="15">15s</option>
+                  <option value="30" selected>30s</option>
+                  <option value="60">60s</option>
+                  <option value="120">120s</option>
+                </select>
+              </label>
+              <button type="button" id="termCopyBtn" class="btn btn-secondary btn-sm">Copy Output</button>
+              <button type="button" id="termDownloadBtn" class="btn btn-secondary btn-sm">Download Log</button>
+              <button type="button" id="termClearBtn" class="btn btn-ghost btn-sm">Clear</button>
+            </div>
+          </div>
+
+          <div class="terminal-quick-section">
+            <div class="terminal-context-row">
+              <span class="term-quick-label">Context Params:</span>
+              <div id="termContextBar" class="term-context-bar"></div>
+            </div>
+            <div class="terminal-cmd-controls">
+              <div id="termCatTabs" class="term-cat-tabs"></div>
+              <input id="termCmdSearch" type="search" class="term-cmd-search" placeholder="Search 45+ commands (nslookup, tcp, smb, process, dns, cert)…" />
+              <label class="term-autorun-label" title="Run command immediately when clicked">
+                <input id="termAutoRunCheck" type="checkbox" />
+                Auto-run
+              </label>
+            </div>
+            <div id="termQuickBar" class="term-quick-bar"></div>
+          </div>
+
+          <div id="termOutput" class="terminal-output" role="log" aria-live="polite" tabindex="0"></div>
+
+          <form id="termForm" class="terminal-input-bar" autocomplete="off">
+            <span id="termPromptLabel" class="term-input-prompt">PS C:\&gt;</span>
+            <input
+              id="termInput"
+              type="text"
+              class="term-input"
+              placeholder="Enter a command to run on localhost (e.g. ipconfig /all, ping -n 4 dc01, nslookup, Test-NetConnection)…"
+              spellcheck="false"
+            />
+            <button type="submit" id="termRunBtn" class="btn btn-primary btn-sm">Run</button>
+            <button type="button" id="termStopBtn" class="btn btn-danger btn-sm hidden">Cancel</button>
+          </form>
+        </section>
+
+        <!-- Dynamic Table & Interactive Filtering Panel -->
+        <section id="resultsPanel" class="panel results-panel hidden">
+          <div class="results-toolbar">
+            <div class="toolbar-left">
+              <input id="tableGlobalSearch" type="search" placeholder="Filter all columns…" />
+              <div id="timeFilterGroup" class="time-filter-group hidden">
+                <label>From <input id="timeFromInput" type="datetime-local" /></label>
+                <label>To <input id="timeToInput" type="datetime-local" /></label>
+              </div>
+            </div>
+
+            <div class="toolbar-right">
+              <span id="rowCountBadge" class="row-count-badge">0 rows</span>
+              <div class="dropdown">
+                <button type="button" id="columnsBtn" class="btn btn-secondary btn-sm">Columns</button>
+                <div id="columnsMenu" class="dropdown-menu hidden"></div>
+              </div>
+              <button type="button" id="exportFilteredBtn" class="btn btn-secondary btn-sm">Export Filtered CSV</button>
+              <button type="button" id="exportAllBtn" class="btn btn-ghost btn-sm">Export All CSV</button>
+            </div>
+          </div>
+
+          <!-- Auto-Generated Facet Filters (User, Client, IP, Event ID, Severity, etc.) -->
+          <div id="facetBar" class="facet-bar"></div>
+
+          <!-- Active Focus Filter Pills -->
+          <div id="activePillsBar" class="active-pills-bar hidden"></div>
+
+          <!-- Dynamic Table -->
+          <div class="table-wrapper">
+            <table id="resultsTable" class="data-table">
+              <thead id="resultsThead"></thead>
+              <tbody id="resultsTbody"></tbody>
+            </table>
+          </div>
+          <div id="emptyTableState" class="empty-state hidden">No matching findings for the active filters.</div>
+        </section>
+
+        <!-- Initial Welcome State -->
+        <section id="welcomeState" class="panel welcome-state">
+          <h2>Ready to Inspect Windows Servers</h2>
+          <p class="muted">
+            1. Enter a target <strong>Hostname or FQDN</strong> above (or leave <code>localhost</code> to inspect this machine).<br />
+            2. Keep <strong>Authenticated Session (UPN)</strong> selected (or choose <strong>Alternate Credentials</strong>) and click <strong>Test Connection</strong>.<br />
+            3. Pick any ready troubleshooting category on the left and click <strong>Run Analysis</strong>. Click any User, Client, IP, or Event ID value in the results table to focus filters immediately, then export to CSV.
+          </p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Row Detail Slide-Over Drawer -->
+  <div id="detailDrawerBackdrop" class="drawer-backdrop hidden"></div>
+  <aside id="detailDrawer" class="detail-drawer hidden" aria-label="Finding Details">
+    <div class="drawer-header">
+      <h3 id="drawerTitle">Finding Details</h3>
+      <div class="drawer-header-actions">
+        <button type="button" id="copyRawBtn" class="btn btn-secondary btn-sm">Copy Full Details</button>
+        <button type="button" id="closeDrawerBtn" class="btn btn-ghost btn-sm" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div id="drawerBody" class="drawer-body"></div>
+  </aside>
+
+  <!-- Process Deep Analysis Modal -->
+  <div id="procDetailModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="procDetailModalTitle">
+      <div class="modal-header">
+        <h3 id="procDetailModalTitle">Process Deep Analysis</h3>
+        <div class="modal-header-actions">
+          <label class="term-autorun-label">
+            <input id="procDetailAutoRefresh" type="checkbox" />
+            Live 2s
+          </label>
+          <button type="button" id="procDetailRefreshBtn" class="btn btn-secondary btn-sm">Refresh</button>
+          <button type="button" id="procDetailKillBtn" class="btn btn-danger btn-sm">Kill Process</button>
+          <button type="button" id="closeProcDetailModalBtn" class="btn btn-ghost btn-sm">✕</button>
+        </div>
+      </div>
+      <div id="procDetailBody" class="proc-detail-body">
+        <div class="muted">Loading process metrics…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Credentials Modal (Memory-Only, Never Stored in LocalStorage) -->
+  <div id="credModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="credModalTitle">
+      <div class="modal-header">
+        <h3 id="credModalTitle">Session Credentials (Run-As)</h3>
+        <button type="button" id="closeCredModalBtn" class="btn btn-ghost btn-sm">✕</button>
+      </div>
+      <form id="credModalForm" autocomplete="off">
+        <p class="muted small">Credentials are kept strictly in browser memory for this session and are never persisted to disk, localStorage, or server logs.</p>
+        <div class="field-group">
+          <label for="credUsername">Username (DOMAIN\User or user@domain.local)</label>
+          <input id="credUsername" type="text" placeholder="CORP\admin.user" required />
+        </div>
+        <div class="field-group">
+          <label for="credPassword">Password</label>
+          <input id="credPassword" type="password" required />
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="clearCredBtn" class="btn btn-ghost">Clear</button>
+          <button type="submit" class="btn btn-primary">Use for Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

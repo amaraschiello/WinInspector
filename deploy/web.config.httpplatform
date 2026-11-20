@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WinInspector IIS Configuration — Option 1: HttpPlatformHandler (Recommended for Kerberos SSO)
+  Prerequisites on IIS Server:
+    1. Install IIS HttpPlatformHandler (https://www.iis.net/downloads/microsoft/httpplatformhandler)
+    2. Install PowerShell 7 LTS (pwsh.exe) & Install-Module Pode -Scope AllUsers
+    3. Enable IIS Windows Authentication (Negotiate first); Disable Anonymous Authentication
+    4. Copy this file to the IIS site root as web.config and update the paths below
+-->
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="httpPlatformHandler"
+           path="*"
+           verb="*"
+           modules="httpPlatformHandler"
+           resourceType="Unspecified" />
+    </handlers>
+
+    <httpPlatform processPath="C:\Program Files\PowerShell\7\pwsh.exe"
+                  arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;C:\inetpub\WinInspector\server\Start-WinInspector.ps1&quot; -Port %HTTP_PLATFORM_PORT% -UseIISAuth"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile="C:\inetpub\WinInspector\logs\iis-stdout"
+                  startupTimeLimit="60"
+                  requestTimeout="00:05:00"
+                  forwardWindowsAuthToken="true">
+      <environmentVariables>
+        <environmentVariable name="WININSPECTOR_ENV" value="Production" />
+      </environmentVariables>
+    </httpPlatform>
+
+    <security>
+      <authentication>
+        <anonymousAuthentication enabled="false" />
+        <windowsAuthentication enabled="true" />
+      </authentication>
+    </security>
+  </system.webServer>
+</configuration>
