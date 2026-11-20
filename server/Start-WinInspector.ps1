@@ -52,31 +52,15 @@ $ErrorActionPreference = 'Stop'
 function Resolve-WinInspectorServerCertificate {
     <#
     .SYNOPSIS
-        Finds the newest valid Server Authentication certificate in Cert:\LocalMachine\My
-        matching the local server's hostname or FQDN.
+        Finds the newest valid, CA-issued Server Authentication certificate in Cert:\LocalMachine\My
+        whose Subject CN / SimpleName matches "$env:COMPUTERNAME*".
     #>
     [CmdletBinding()]
     param()
 
     $shortName = ([string]$env:COMPUTERNAME).Trim()
-    $candidateNames = [System.Collections.Generic.List[string]]::new()
-    if (-not [string]::IsNullOrWhiteSpace($shortName)) {
-        $candidateNames.Add($shortName)
-    }
-
-    try {
-        $dnsHost = [System.Net.Dns]::GetHostEntry($shortName).HostName
-        if (-not [string]::IsNullOrWhiteSpace($dnsHost) -and ($candidateNames -notcontains $dnsHost)) {
-            $candidateNames.Add($dnsHost.Trim())
-        }
-    }
-    catch {}
-
-    if (-not [string]::IsNullOrWhiteSpace($env:USERDNSDOMAIN) -and -not [string]::IsNullOrWhiteSpace($shortName)) {
-        $fqdnGuess = "$shortName.$($env:USERDNSDOMAIN.Trim())"
-        if ($candidateNames -notcontains $fqdnGuess) {
-            $candidateNames.Add($fqdnGuess)
-        }
+    if ([string]::IsNullOrWhiteSpace($shortName)) {
+        throw "Cannot auto-select server certificate because COMPUTERNAME is empty."
     }
 
     $now = Get-Date
@@ -87,51 +71,26 @@ function Resolve-WinInspectorServerCertificate {
         if (-not $cert.HasPrivateKey) { continue }
         if ($cert.NotBefore -gt $now -or $cert.NotAfter -le $now) { continue }
 
+        # Exclude self-signed certificates
+        if ($cert.Issuer -eq $cert.Subject) { continue }
+
         $ekuList = if ($null -ne $cert.EnhancedKeyUsageList) { @($cert.EnhancedKeyUsageList) } else { @() }
         $hasServerAuth = @($ekuList | Where-Object { $_.ObjectId -eq $serverAuthOid }).Count -gt 0
         if (-not $hasServerAuth) { continue }
 
-        $certNames = [System.Collections.Generic.List[string]]::new()
-        if ($null -ne $cert.DnsNameList) {
-            foreach ($entry in @($cert.DnsNameList)) {
-                $dnsVal = ([string]$entry.Unicode).Trim()
-                if (-not [string]::IsNullOrWhiteSpace($dnsVal)) {
-                    $certNames.Add($dnsVal)
-                }
-            }
+        # Match Subject SimpleName / CN against "$shortName*" (e.g. LISC-MGMTP03 or LISC-MGMTP03.ivcorp.net)
+        $simpleName = ''
+        try {
+            $simpleName = ([string]$cert.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)).Trim()
         }
+        catch {}
         $cnMatch = [regex]::Match([string]$cert.Subject, '(?:^|,\s*)CN=([^,]+)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-        if ($cnMatch.Success) {
-            $cnVal = $cnMatch.Groups[1].Value.Trim()
-            if (-not [string]::IsNullOrWhiteSpace($cnVal) -and ($certNames -notcontains $cnVal)) {
-                $certNames.Add($cnVal)
-            }
-        }
+        $cnVal = if ($cnMatch.Success) { $cnMatch.Groups[1].Value.Trim() } else { '' }
 
-        $nameMatched = $false
-        foreach ($certName in $certNames) {
-            foreach ($hostName in $candidateNames) {
-                if ($certName -ieq $hostName) {
-                    $nameMatched = $true
-                    break
-                }
-                if (-not [string]::IsNullOrWhiteSpace($shortName) -and $certName -ilike "$shortName.*") {
-                    $nameMatched = $true
-                    break
-                }
-                if ($certName.StartsWith('*.') -and $hostName.Contains('.')) {
-                    $suffix = $certName.Substring(2)
-                    $dotIdx = $hostName.IndexOf('.')
-                    if ($dotIdx -gt 0 -and $hostName.Substring($dotIdx + 1) -ieq $suffix) {
-                        $nameMatched = $true
-                        break
-                    }
-                }
-            }
-            if ($nameMatched) { break }
-        }
+        $nameMatched = ($simpleName -ilike "$shortName*") -or ($cnVal -ilike "$shortName*")
         if (-not $nameMatched) { continue }
 
+        # Verify the certificate chains to a trusted Certificate Authority
         $isTrusted = $false
         try { $isTrusted = $cert.Verify() } catch { $isTrusted = $false }
         if (-not $isTrusted) { continue }
@@ -141,8 +100,7 @@ function Resolve-WinInspectorServerCertificate {
 
     $selected = @($matching) | Sort-Object -Property NotAfter -Descending | Select-Object -First 1
     if ($null -eq $selected) {
-        $searched = ($candidateNames -join ', ')
-        throw "No valid, trusted Server Authentication certificate with a private key was found in Cert:\LocalMachine\My matching [$searched]. Install a valid certificate or pass -CertificateThumbprint or -SelfSigned."
+        throw "No valid, CA-trusted Server Authentication certificate with a private key was found in Cert:\LocalMachine\My matching '$shortName*'."
     }
 
     return $selected
@@ -184,10 +142,17 @@ $credVault = New-WinInspectorCredVault
 
 $enableHttps = [bool]$UseHttps -or (-not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) -or [bool]$SelfSigned
 $resolvedThumbprint = $CertificateThumbprint.Trim()
+$certStoreLocation = ''
 if ($enableHttps -and [string]::IsNullOrWhiteSpace($resolvedThumbprint) -and (-not $SelfSigned)) {
     $selectedCert = Resolve-WinInspectorServerCertificate
     $resolvedThumbprint = $selectedCert.Thumbprint
-    Write-Host "Using Server Authentication certificate: Subject='$($selectedCert.Subject)', Thumbprint='$resolvedThumbprint', Expires='$($selectedCert.NotAfter.ToString('yyyy-MM-dd'))'"
+    $certStoreLocation = 'LocalMachine'
+    Write-Host "Using Server Authentication certificate: Subject='$($selectedCert.Subject)', Issuer='$($selectedCert.Issuer)', Thumbprint='$resolvedThumbprint', Expires='$($selectedCert.NotAfter.ToString('yyyy-MM-dd'))'"
+}
+elseif ($enableHttps -and (-not [string]::IsNullOrWhiteSpace($resolvedThumbprint))) {
+    if (Test-Path "Cert:\LocalMachine\My\$resolvedThumbprint") {
+        $certStoreLocation = 'LocalMachine'
+    }
 }
 
 # Resolve default ListenAddress: '*' (all interfaces, dual-stack IPv4/IPv6) when elevated/SYSTEM,
@@ -224,6 +189,9 @@ Start-PodeServer -Threads $Threads -RootPath $projectRoot {
         if ($useDualMode) { $epParams['DualMode'] = $true }
         if (-not [string]::IsNullOrWhiteSpace($resolvedThumbprint)) {
             $epParams['CertificateThumbprint'] = $resolvedThumbprint
+            if (-not [string]::IsNullOrWhiteSpace($certStoreLocation)) {
+                $epParams['CertificateStoreLocation'] = $certStoreLocation
+            }
         }
         else {
             $epParams['SelfSigned'] = $true
