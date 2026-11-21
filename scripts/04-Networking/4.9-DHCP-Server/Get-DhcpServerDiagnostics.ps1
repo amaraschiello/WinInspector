@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Reads Windows DHCP Server text logs over SMB (\\$Computer\c$\Windows\System32\dhcp\DhcpSrvLog-*.txt
@@ -38,12 +38,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 5000)]
-    [int]$MaxResults = 500
+    [int]$MaxResults = 500,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -302,7 +307,7 @@ try {
         }
 
         try {
-            $evRes = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $evScript -ArgumentList @($HoursBack, $ClientFilter, $MaxResults)
+            $evRes = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $evScript -ArgumentList @($HoursBack, $ClientFilter, $effectiveMax)
             if ($LogSource -eq 'Event Logs Only') { $protocolUsed = $evRes.ProtocolUsed }
             elseif ($protocolUsed -eq 'SMB') { $protocolUsed = "SMB + $($evRes.ProtocolUsed)" }
             else { $protocolUsed = $evRes.ProtocolUsed }
@@ -321,7 +326,7 @@ try {
         }
     }
 
-    $rows = @($allRows.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $MaxResults)
+    $rows = @($allRows.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $effectiveMax)
 
     $schema = @(
         @{ key = 'TimeCreated'; label = 'Timestamp';    type = 'datetime'; filterable = $true;  facet = $false; defaultVisible = $true }

@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Diagnoses Kerberos issues: System Kerberos errors (SPN, delegation, KDC), Security Kerberos ticket failures (4768, 4769, 4771), and Domain Secure Channel check.
@@ -25,12 +25,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 2000)]
-    [int]$MaxResults = 300
+    [int]$MaxResults = 300,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -123,7 +128,7 @@ $remoteScript = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $MaxResults)
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $effectiveMax)
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     foreach ($w in @($res.Data.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)

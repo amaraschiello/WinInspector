@@ -26,12 +26,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 2000)]
-    [int]$MaxResults = 250
+    [int]$MaxResults = 250,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -118,7 +123,7 @@ $remoteScript = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $MaxResults)
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $effectiveMax)
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     foreach ($w in @($res.Data.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)

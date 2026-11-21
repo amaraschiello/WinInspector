@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Queries Windows Security Event Log for Logon Failures (4625), Account Lockouts (4740),
@@ -36,12 +36,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 5000)]
-    [int]$MaxResults = 500
+    [int]$MaxResults = 500,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -283,7 +288,7 @@ $fallbackRpc = {
 
 try {
     $parserStr = $parseEventsCore.ToString()
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $MaxResults, $intIds, $UserName, $ClientHost, $parserStr) -FallbackScriptBlock $fallbackRpc
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $effectiveMax, $intIds, $UserName, $ClientHost, $parserStr) -FallbackScriptBlock $fallbackRpc
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     foreach ($w in @($res.Data.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)

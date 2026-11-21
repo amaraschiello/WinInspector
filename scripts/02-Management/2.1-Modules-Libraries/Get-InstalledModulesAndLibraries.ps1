@@ -13,12 +13,17 @@ param(
     [Parameter()] [System.Management.Automation.PSCredential]$Credential,
     [Parameter()] [ValidateSet('Auto', 'WinRM-HTTPS', 'WinRM-HTTP', 'CIM-DCOM', 'RPC')] [string]$Protocol = 'Auto',
     [Parameter()] [string]$NameFilter = '',
-    [Parameter()] [ValidateRange(10, 2000)] [int]$MaxResults = 300
+    [Parameter()] [ValidateRange(10, 2000)] [int]$MaxResults = 300,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $warnings = [System.Collections.Generic.List[string]]::new()
@@ -70,7 +75,7 @@ $remoteScript = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($NameFilter, $MaxResults)
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($NameFilter, $effectiveMax)
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)
 

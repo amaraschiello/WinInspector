@@ -26,12 +26,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 2000)]
-    [int]$MaxResults = 250
+    [int]$MaxResults = 250,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -91,7 +96,8 @@ $remoteScript = {
     $wsusServer = if ($wuKey -and $wuKey.PSObject.Properties['WUServer'] -and $wuKey.WUServer) { $wuKey.WUServer } else { 'Windows Update (Direct / Not Configured via GPO)' }
 
     $pfrNote = if ($pfrEntries.Count -gt 0) { " | Queued File Renames (Info): $($pfrEntries.Count) entry(s)" } else { '' }
-    $pfrDetail = if ($pfrEntries.Count -gt 0) { "`nPendingFileRenameOperations (Informational - does not by itself require reboot):`n" + (($pfrEntries | Select-Object -First 20) -join "`n") } else { '' }
+    $pfrShown = if ($Max -lt 2147483647) { $pfrEntries | Select-Object -First 20 } else { $pfrEntries }
+    $pfrDetail = if ($pfrEntries.Count -gt 0) { "`nPendingFileRenameOperations (Informational - does not by itself require reboot):`n" + ($pfrShown -join "`n") } else { '' }
 
     $out.Add([PSCustomObject]@{
         TimeCreated = (Get-Date).ToUniversalTime().ToString('o')
@@ -105,7 +111,8 @@ $remoteScript = {
     })
 
     # Recent HotFixes
-    $hotfixes = @(Get-CimInstance -ClassName Win32_QuickFixEngineering -ErrorAction SilentlyContinue | Sort-Object InstalledOn -Descending | Select-Object -First 20)
+    $hotfixes = @(Get-CimInstance -ClassName Win32_QuickFixEngineering -ErrorAction SilentlyContinue | Sort-Object InstalledOn -Descending)
+    if ($Max -lt 2147483647) { $hotfixes = @($hotfixes | Select-Object -First 20) }
     foreach ($hf in $hotfixes) {
         $dt = if ($hf.InstalledOn) { ([datetime]$hf.InstalledOn).ToUniversalTime().ToString('o') } else { (Get-Date).ToUniversalTime().ToString('o') }
         $out.Add([PSCustomObject]@{
@@ -153,7 +160,7 @@ $remoteScript = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $MaxResults)
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $effectiveMax)
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)
 

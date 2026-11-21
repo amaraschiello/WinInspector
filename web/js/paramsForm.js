@@ -74,6 +74,22 @@ export function renderParametersForm({ formEl, gridEl, presetsEl, subCategory })
       if (p.name === 'HoursBack') {
         hoursBackInput = input;
       }
+    } else if (p.type === 'boolean') {
+      const wrap = document.createElement('label');
+      wrap.className = 'checkbox-field';
+      wrap.setAttribute('for', inputId);
+
+      const cb = document.createElement('input');
+      cb.id = inputId;
+      cb.type = 'checkbox';
+      cb.dataset.paramName = p.name;
+      cb.dataset.paramType = 'boolean';
+      cb.checked = Boolean(p.default);
+
+      const txt = document.createElement('span');
+      txt.textContent = p.checkboxLabel || 'Enable';
+      wrap.append(cb, txt);
+      group.appendChild(wrap);
     } else {
       const input = document.createElement('input');
       input.id = inputId;
@@ -129,6 +145,8 @@ export function collectParameterValues(gridEl) {
     if (type === 'multiselect') {
       const checked = Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map((c) => c.value);
       result[name] = checked;
+    } else if (type === 'boolean') {
+      result[name] = Boolean(el.checked);
     } else if (type === 'number') {
       if (el.value !== '') result[name] = Number(el.value);
     } else {

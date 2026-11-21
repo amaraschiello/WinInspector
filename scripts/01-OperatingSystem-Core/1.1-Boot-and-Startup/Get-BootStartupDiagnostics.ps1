@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Collects Boot & Startup diagnostics (BIOS/UEFI, Secure Boot, TPM, Kernel-Boot & Driver init events).
@@ -25,12 +25,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 2000)]
-    [int]$MaxResults = 250
+    [int]$MaxResults = 250,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -143,7 +148,7 @@ $fallbackRpc = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $MaxResults) -FallbackScriptBlock $fallbackRpc
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $effectiveMax) -FallbackScriptBlock $fallbackRpc
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     foreach ($w in @($res.Data.Warnings)) { $warnings.Add($w) }
 

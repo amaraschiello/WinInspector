@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Inspects Windows Firewall profiles, Security Log WFP drops (5152/5157),
@@ -37,12 +37,17 @@ param(
 
     [Parameter()]
     [ValidateRange(10, 2000)]
-    [int]$MaxResults = 300
+    [int]$MaxResults = 300,
+
+    [Parameter()]
+    [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+
+$effectiveMax = if ($QueryAll) { 2147483647 } else { $MaxResults }
 Import-Module (Join-Path $PSScriptRoot '..\..\_Common\WinInspector.Common.psm1') -Force
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -167,7 +172,7 @@ try {
     # 1. Event Logs & Firewall Profiles (WinRM)
     if ($LogSource -in @('All (Events + pfirewall.log)', 'Event Logs Only')) {
         try {
-            $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $IpFilter, $ActionFilter, $MaxResults)
+            $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @($HoursBack, $IpFilter, $ActionFilter, $effectiveMax)
             $protocolUsed = $res.ProtocolUsed
             $enabledProfiles = $res.Data.EnabledProfiles
             $dropCount += $res.Data.DropCount
@@ -293,12 +298,12 @@ try {
             }
 
             # Keep newest entries first
-            $newest = @($parsedEntries.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $MaxResults)
+            $newest = @($parsedEntries.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $effectiveMax)
             foreach ($r in $newest) { $allRows.Add($r) }
         }
     }
 
-    $rows = @($allRows.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $MaxResults)
+    $rows = @($allRows.ToArray() | Sort-Object TimeCreated -Descending | Select-Object -First $effectiveMax)
 
     $schema = @(
         @{ key = 'TimeCreated'; label = 'Timestamp';    type = 'datetime'; filterable = $true;  facet = $false; defaultVisible = $true }

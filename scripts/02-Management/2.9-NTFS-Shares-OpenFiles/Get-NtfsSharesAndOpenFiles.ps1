@@ -11,7 +11,8 @@
 param(
     [Parameter(Mandatory)] [string]$ComputerName,
     [Parameter()] [System.Management.Automation.PSCredential]$Credential,
-    [Parameter()] [ValidateSet('Auto', 'WinRM-HTTPS', 'WinRM-HTTP', 'CIM-DCOM', 'RPC')] [string]$Protocol = 'Auto'
+    [Parameter()] [ValidateSet('Auto', 'WinRM-HTTPS', 'WinRM-HTTP', 'CIM-DCOM', 'RPC')] [string]$Protocol = 'Auto',
+    [Parameter()] [switch]$QueryAll
 )
 
 Set-StrictMode -Version Latest
@@ -23,6 +24,7 @@ $warnings = [System.Collections.Generic.List[string]]::new()
 $errors   = [System.Collections.Generic.List[string]]::new()
 
 $remoteScript = {
+    param($All)
     $out = New-Object System.Collections.Generic.List[object]
 
     $shares = @(Get-SmbShare -ErrorAction SilentlyContinue)
@@ -37,7 +39,8 @@ $remoteScript = {
             try {
                 $acl = Get-Acl -LiteralPath $sh.Path -ErrorAction SilentlyContinue
                 if ($acl) {
-                    $ntfsPerms = (@($acl.Access) | Select-Object -First 10 | ForEach-Object { "$($_.IdentityReference):$($_.FileSystemRights)($($_.AccessControlType))" }) -join '; '
+                    $aclEntries = if ($All) { @($acl.Access) } else { @($acl.Access) | Select-Object -First 10 }
+                    $ntfsPerms = ($aclEntries | ForEach-Object { "$($_.IdentityReference):$($_.FileSystemRights)($($_.AccessControlType))" }) -join '; '
                 }
             } catch {}
         }
@@ -55,7 +58,8 @@ $remoteScript = {
     }
 
     # Open SMB Files
-    $openFiles = @(Get-SmbOpenFile -ErrorAction SilentlyContinue | Select-Object -First 200)
+    $allOpenFiles = @(Get-SmbOpenFile -ErrorAction SilentlyContinue)
+    $openFiles = if ($All) { $allOpenFiles } else { @($allOpenFiles | Select-Object -First 200) }
     foreach ($of in $openFiles) {
         $out.Add([PSCustomObject]@{
             Kind       = 'SMB Open File'
@@ -69,8 +73,10 @@ $remoteScript = {
         })
     }
 
-    # Local processes with open file / handle counts (top 40 by HandleCount)
-    foreach ($p in @(Get-Process -ErrorAction SilentlyContinue | Sort-Object HandleCount -Descending | Select-Object -First 40)) {
+    # Local processes with open file / handle counts (top 40 by HandleCount unless QueryAll is checked)
+    $allProcs = @(Get-Process -ErrorAction SilentlyContinue | Sort-Object HandleCount -Descending)
+    $procs = if ($All) { $allProcs } else { @($allProcs | Select-Object -First 40) }
+    foreach ($p in $procs) {
         $pPath = try { [string]$p.Path } catch { '' }
         $out.Add([PSCustomObject]@{
             Kind       = 'Process File Handles'
@@ -92,7 +98,7 @@ $remoteScript = {
 }
 
 try {
-    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript
+    $res = Invoke-WinInspectorRemote -ComputerName $ComputerName -Credential $Credential -Protocol $Protocol -ScriptBlock $remoteScript -ArgumentList @([bool]$QueryAll)
     foreach ($w in @($res.Warnings)) { $warnings.Add($w) }
     $rows = @($res.Data.Rows)
 
